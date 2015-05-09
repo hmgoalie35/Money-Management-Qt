@@ -6,7 +6,7 @@ MainWindow::MainWindow(QWidget *parent) :
     ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
-    setWindowIcon(QIcon(":/imgs/mainwindow_logo.gif"));
+    setWindowIcon(QIcon(":/imgs/money_management.gif"));
     setWindowTitle("Money Management");
 }
 

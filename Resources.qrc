@@ -1,5 +1,6 @@
 <RCC>
     <qresource prefix="/imgs">
-        <file>mainwindow_logo.gif</file>
+        <file>money_management.gif</file>
+        <file>money_management.ico</file>
     </qresource>
 </RCC>
