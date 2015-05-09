@@ -1,3 +1,10 @@
+# Databases
+*.db
+*.sql
+
+Notes.txt
+
+
 # C++ objects and libs
 
 *.slo
