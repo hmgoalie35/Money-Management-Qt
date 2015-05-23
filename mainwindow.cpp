@@ -165,3 +165,25 @@ void MainWindow::on_pushButtonSubmit_clicked()
 void MainWindow::reenable_submit_btn(){
   ui->pushButtonSubmit->setEnabled(true);
 }
+
+void MainWindow::on_actionQuit_triggered()
+{
+  int result = QMessageBox::question(NULL, "Quit?", "Are you sure you want to quit?");
+  if(result == QMessageBox::Yes){
+      qDebug() << "Exiting, user selected yes";
+      this->destroy();
+    }else{
+      qDebug() << "Not exiting, user selected no";
+    }
+
+}
+void MainWindow::closeEvent(QCloseEvent* event){
+  int result = QMessageBox::question(NULL, "Quit?", "Are you sure you want to quit?");
+  if(result == QMessageBox::Yes){
+      qDebug() << "Exiting, user selected yes";
+      event->accept();
+    }else{
+      qDebug() << "Not exiting, user selected no";
+      event->ignore();
+    }
+}
