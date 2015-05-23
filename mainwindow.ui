@@ -83,8 +83,14 @@
     <property name="text">
      <string>Submit</string>
     </property>
+    <property name="autoDefault">
+     <bool>false</bool>
+    </property>
+    <property name="default">
+     <bool>false</bool>
+    </property>
    </widget>
-   <widget class="QWidget" name="">
+   <widget class="QWidget" name="layoutWidget">
     <property name="geometry">
      <rect>
       <x>20</x>
@@ -116,6 +122,9 @@
      </item>
      <item>
       <widget class="QComboBox" name="comboBoxMode">
+       <property name="currentText">
+        <string/>
+       </property>
        <property name="maxVisibleItems">
         <number>2</number>
        </property>
@@ -123,7 +132,7 @@
      </item>
     </layout>
    </widget>
-   <widget class="QWidget" name="">
+   <widget class="QWidget" name="layoutWidget2">
     <property name="geometry">
      <rect>
       <x>100</x>
@@ -151,6 +160,19 @@
       </widget>
      </item>
     </layout>
+   </widget>
+   <widget class="QLabel" name="labelTotal">
+    <property name="geometry">
+     <rect>
+      <x>80</x>
+      <y>115</y>
+      <width>111</width>
+      <height>16</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Total: $0.00</string>
+    </property>
    </widget>
   </widget>
   <widget class="QMenuBar" name="menuBar">

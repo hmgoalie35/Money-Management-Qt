@@ -3,6 +3,7 @@
 
 #include <QMainWindow>
 #include <QLabel>
+#include <QtSql>
 namespace Ui {
 class MainWindow;
 }
@@ -18,9 +19,16 @@ public:
 private slots:
   void on_actionAbout_triggered();
 
+  void on_pushButtonSubmit_clicked();
+  void setup_database();
+  bool open_database();
+  void close_database();
+  void reenable_submit_btn();
 private:
     Ui::MainWindow *ui;
-    QLabel* status_bar_label;
+    QSqlDatabase transaction_db;
+    QString db_path;
+    QLocale format;
 };
 
 #endif // MAINWINDOW_H
