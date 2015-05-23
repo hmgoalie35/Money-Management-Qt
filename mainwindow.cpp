@@ -15,12 +15,9 @@ MainWindow::MainWindow(QWidget *parent) :
     setWindowIcon(QIcon(":/imgs/money_management.gif"));
     setWindowTitle("Money Management");
     setFixedSize(width(), height());
-    ui->statusBar->showMessage("", MESSAGE_DISPLAY_LENGTH);
     ui->dateEdit->setDate(QDate::currentDate());
-
     ui->comboBoxMode->addItem("Deposit");
     ui->comboBoxMode->addItem("Withdraw");
-
     ui->comboBoxMode->setCurrentIndex(-1);
     ui->lineEditDepWithdr->setValidator(new QDoubleValidator(1, 10000000, 2, ui->lineEditDepWithdr));
     db_path = QDir::currentPath() + "/transaction_db.db";
@@ -28,7 +25,7 @@ MainWindow::MainWindow(QWidget *parent) :
     setup_database();
 
     open_database();
-    QSqlQuery qry = transaction_db.exec("SELECT amount FROM transactions ORDER BY id DESC LIMIT 1;");
+    QSqlQuery qry = transaction_db.exec("SELECT balance FROM transactions ORDER BY id DESC LIMIT 1;");
     if(qry.next()){
       ui->labelTotal->setText("Total: " + format.toCurrencyString(qry.value(0).toDouble()));
     }else{
@@ -50,14 +47,20 @@ void MainWindow::setup_database(){
   bool exists = db_info.exists();
   bool status = transaction_db.open();
   if(!status){
-      //add in message boxes showing errors...
       ui->statusBar->showMessage("Error connecting to database", MESSAGE_DISPLAY_LENGTH);
+      QMessageBox::critical(this, "Error Connecting To Database", "Error opening database, please restart the program");
+      ui->lineEditDepWithdr->setEnabled(false);
+      ui->lineEditDescription->setEnabled(false);
+      ui->pushButtonSubmit->setEnabled(false);
+      ui->comboBoxMode->setEnabled(false);
+      ui->dateEdit->setEnabled(false);
+      ui->menuBar->setEnabled(false);
       return;
   }
-  ui->statusBar->showMessage("Connected", MESSAGE_DISPLAY_LENGTH);
+  ui->statusBar->showMessage("Connected...", MESSAGE_DISPLAY_LENGTH);
   if(!exists){
       qDebug() << "Creating transaction table";
-      QSqlQuery create_transaction_table_qry = transaction_db.exec("CREATE TABLE transactions(id INTEGER PRIMARY KEY AUTOINCREMENT, description TEXT, mode TEXT , amount DOUBLE, date_added DATE);");
+      QSqlQuery create_transaction_table_qry = transaction_db.exec("CREATE TABLE transactions(id INTEGER PRIMARY KEY AUTOINCREMENT, description TEXT, mode TEXT, trans_amount DOUBLE, balance DOUBLE, date_added DATE);");
       qDebug() << create_transaction_table_qry.lastError();
   }
   close_database();
@@ -69,6 +72,13 @@ bool MainWindow::open_database(){
       ui->statusBar->showMessage("Connected...", MESSAGE_DISPLAY_LENGTH);
   }else{
       ui->statusBar->showMessage("Error connecting to database", MESSAGE_DISPLAY_LENGTH);
+      QMessageBox::critical(this, "Error Connecting To Database", "Error opening database, please restart the program");
+      ui->lineEditDepWithdr->setEnabled(false);
+      ui->lineEditDescription->setEnabled(false);
+      ui->pushButtonSubmit->setEnabled(false);
+      ui->comboBoxMode->setEnabled(false);
+      ui->dateEdit->setEnabled(false);
+      ui->menuBar->setEnabled(false);
     }
   return status;
 }
@@ -88,7 +98,7 @@ void MainWindow::on_pushButtonSubmit_clicked()
   if(!open_database()){
       //error opening db.
       //notify user transaction was not saved.
-
+      QMessageBox::critical(this, "Error Saving Transaction", "Error saving the transaction, please try again");
       qDebug() << "Error connecting to database (submit button)";
       return;
     }
@@ -101,7 +111,7 @@ void MainWindow::on_pushButtonSubmit_clicked()
       qDebug() << "Invalid Input";
       return;
   }
-  QSqlQuery last_trans = transaction_db.exec("SELECT amount FROM transactions ORDER BY id DESC LIMIT 1;");
+  QSqlQuery last_trans = transaction_db.exec("SELECT balance FROM transactions ORDER BY id DESC LIMIT 1;");
   double last_balance = 0;
   if(last_trans.next()){
       qDebug() << "this should print once";
@@ -122,10 +132,11 @@ void MainWindow::on_pushButtonSubmit_clicked()
       ui->labelTotal->setText("Total: " + format.toCurrencyString(last_balance));
   }
   QSqlQuery add_transaction_qry;
-  add_transaction_qry.prepare("INSERT INTO transactions (description, amount, mode, date_added) VALUES (:desc, :amount, :mode, :date);");
+  add_transaction_qry.prepare("INSERT INTO transactions (description, mode, trans_amount, balance, date_added) VALUES (:desc, :mode, :trans_amount, :balance, :date);");
   add_transaction_qry.bindValue(":desc", description);
-  add_transaction_qry.bindValue(":amount", last_balance);
   add_transaction_qry.bindValue(":mode", mode);
+  add_transaction_qry.bindValue(":trans_amount", amount);
+  add_transaction_qry.bindValue(":balance", last_balance);
   add_transaction_qry.bindValue(":date", ui->dateEdit->date());
   bool result = add_transaction_qry.exec();
   qDebug() << add_transaction_qry.lastError();
