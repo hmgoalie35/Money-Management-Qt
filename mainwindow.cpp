@@ -4,6 +4,7 @@
 #include <QDebug>
 #include <QMessageBox>
 #include <QFileInfo>
+#include <QFileDialog>
 
 #define MESSAGE_DISPLAY_LENGTH 4000
 
@@ -179,5 +180,51 @@ void MainWindow::closeEvent(QCloseEvent* event){
     }else{
       qDebug() << "Not exiting, user selected no";
       event->ignore();
+    }
+}
+
+void MainWindow::on_actionExport_triggered()
+{
+    QString filename = QFileDialog::getSaveFileName(this, tr("Export Database"), QDir::currentPath(), tr("Sql File (*.sql)"));
+    if(!filename.isEmpty()){
+      open_database();
+      QSqlQuery transactions_exist_qry = transaction_db.exec("SELECT count(id) FROM transactions;");
+      qDebug() << "Transactions exist qry status " << transactions_exist_qry.lastError();
+      if(transactions_exist_qry.next()){
+          if(transactions_exist_qry.value(0) <=0){
+                qDebug() << "there are no transactions to export";
+                QMessageBox::information(this, "No Transactions Exist", "There are no transactions to export, export cancelled");
+                return;
+            }
+      }else{
+          qDebug() << "there are no transactions to export";
+          QMessageBox::information(this, "No Transactions Exist", "There are no transactions to export, export cancelled");
+          return;
+        }
+      qDebug() << "transactions exist, go ahead and export";
+      QSqlQuery get_all_transactions_qry = transaction_db.exec("SELECT id, description, mode, trans_amount, balance, date_added FROM transactions;");
+      qDebug() << "Get all transactions for export status: " << get_all_transactions_qry.lastError();
+      int count = 0;
+      QFile export_file(filename);
+      if(!export_file.open(QFile::WriteOnly)){
+          QMessageBox::information(this, "Error Opening File", "Error opening " + filename + " for export, please try again");
+          return;
+        }
+      export_file.write("PRAGMA foreign_keys=OFF;\n");
+      export_file.write("BEGIN TRANSACTION;\n");
+      export_file.write("CREATE TABLE transactions(id INTEGER PRIMARY KEY AUTOINCREMENT, description TEXT, mode TEXT, trans_amount DOUBLE, balance DOUBLE, date_added DATE);\n");
+      //need to add error checking for 0 transactions.
+      while(get_all_transactions_qry.next()){
+          QString write_str = "INSERT INTO transactions (id, description, mode, trans_amount, balance, date_added) VALUES (" + get_all_transactions_qry.value(0).toString() + ", " + get_all_transactions_qry.value(1).toString() + ", " + get_all_transactions_qry.value(2).toString() + ", " + get_all_transactions_qry.value(3).toString() + ", " + get_all_transactions_qry.value(4).toString() + ", " + get_all_transactions_qry.value(5).toString() + ");\n";
+          qDebug() << "Writing " << write_str;
+          export_file.write(write_str.toUtf8());
+          count++;
+        }
+      export_file.write("COMMIT;");
+      QMessageBox::information(this, "Success", QString::number(count) + " transactions exported to " + filename);
+      qDebug() << count << " transactions written to " << filename;
+      export_file.flush();
+      export_file.close();
+      close_database();
     }
 }

@@ -28,6 +28,8 @@ private slots:
   void on_actionQuit_triggered();
   void closeEvent(QCloseEvent*);
 
+  void on_actionExport_triggered();
+
 private:
     Ui::MainWindow *ui;
     QSqlDatabase transaction_db;
