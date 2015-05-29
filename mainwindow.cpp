@@ -5,6 +5,7 @@
 #include <QMessageBox>
 #include <QFileInfo>
 #include <QFileDialog>
+#include <QTextStream>
 
 #define MESSAGE_DISPLAY_LENGTH 4000
 
@@ -215,7 +216,7 @@ void MainWindow::on_actionExport_triggered()
       export_file.write("CREATE TABLE transactions(id INTEGER PRIMARY KEY AUTOINCREMENT, description TEXT, mode TEXT, trans_amount DOUBLE, balance DOUBLE, date_added DATE);\n");
       //need to add error checking for 0 transactions.
       while(get_all_transactions_qry.next()){
-          QString write_str = "INSERT INTO transactions (id, description, mode, trans_amount, balance, date_added) VALUES (" + get_all_transactions_qry.value(0).toString() + ", " + get_all_transactions_qry.value(1).toString() + ", " + get_all_transactions_qry.value(2).toString() + ", " + get_all_transactions_qry.value(3).toString() + ", " + get_all_transactions_qry.value(4).toString() + ", " + get_all_transactions_qry.value(5).toString() + ");\n";
+          QString write_str = "INSERT INTO transactions (id, description, mode, trans_amount, balance, date_added) VALUES (" + get_all_transactions_qry.value(0).toString() + ", '" + get_all_transactions_qry.value(1).toString() + "', '" + get_all_transactions_qry.value(2).toString() + "', " + get_all_transactions_qry.value(3).toString() + ", " + get_all_transactions_qry.value(4).toString() + ", '" + get_all_transactions_qry.value(5).toString() + "');\n";
           qDebug() << "Writing " << write_str;
           export_file.write(write_str.toUtf8());
           count++;
@@ -227,4 +228,61 @@ void MainWindow::on_actionExport_triggered()
       export_file.close();
       close_database();
     }
+}
+
+void MainWindow::on_actionImport_triggered()
+{
+  QString filename = QFileDialog::getOpenFileName(this, tr("Import Database"), QDir::currentPath(), tr("Sql File (*.sql)"));
+  if(!filename.isEmpty()){
+
+    //@TODO -- auto backup the datbase? -- create backups folder...
+    int choice = QMessageBox::question(this, "Overwrite existing data?", "This action will overwrite any existing data, are you sure you want to continue?");
+    if(choice == QMessageBox::Yes){
+        open_database();
+        QSqlQuery drop_table_qry = transaction_db.exec("DROP TABLE transactions;");
+        qDebug() << "drop table qry result: " << drop_table_qry.lastError();
+        QFile import_file(filename);
+        if(!import_file.open(QFile::ReadOnly)){
+            QMessageBox::information(this, "Error Opening File", "Error opening " + filename + " for import, please try again");
+            return;
+          }
+        QTextStream in(&import_file);
+        QStringList errors;
+        while(!in.atEnd()){
+            QString statement = in.readLine();
+            QSqlQuery qry = transaction_db.exec(statement);
+            if(qry.lastError().text() != " "){
+                errors.push_back("Error: " + qry.lastError().text() + "\nStatement: " + statement);
+                qDebug() << "Error: " << qry.lastError() << "\nStatement: " << statement;
+              }
+          }
+        if(errors.empty()){
+            QMessageBox::information(this, "Success", "All data successfully imported");
+          }else{
+            QMessageBox::warning(this, QString::number(errors.size()) + " Error(s)", "Encountered " + QString::number(errors.size()) + " errors(s)");
+          }
+        import_file.close();
+        close_database();
+    }
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 }

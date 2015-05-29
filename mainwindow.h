@@ -30,6 +30,8 @@ private slots:
 
   void on_actionExport_triggered();
 
+  void on_actionImport_triggered();
+
 private:
     Ui::MainWindow *ui;
     QSqlDatabase transaction_db;
