@@ -265,24 +265,20 @@ void MainWindow::on_actionImport_triggered()
         close_database();
     }
   }
+}
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+void MainWindow::on_actionDelete_triggered()
+{
+  int choice = QMessageBox::question(this, "Are you sure?", "Are you sure you want to delete the entire database? This cannot be undone");
+  if(choice == QMessageBox::Yes){
+      open_database();
+      QSqlQuery remove_all_records_qry = transaction_db.exec("DELETE FROM transactions;");
+      qDebug() << "drop table qry result: " << remove_all_records_qry.lastError();
+      close_database();
+      if(remove_all_records_qry.lastError().text() == " "){
+          ui->statusBar->showMessage("Database successfully deleted", MESSAGE_DISPLAY_LENGTH);
+        }else{
+          ui->statusBar->showMessage("Error deleting database", MESSAGE_DISPLAY_LENGTH);
+        }
+    }
 }
