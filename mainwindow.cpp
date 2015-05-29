@@ -258,6 +258,12 @@ void MainWindow::on_actionImport_triggered()
           }
         if(errors.empty()){
             QMessageBox::information(this, "Success", "All data successfully imported");
+            QSqlQuery qry = transaction_db.exec("SELECT balance FROM transactions ORDER BY id DESC LIMIT 1;");
+            if(qry.next()){
+              ui->labelTotal->setText("Total: " + format.toCurrencyString(qry.value(0).toDouble()));
+            }else{
+              ui->labelTotal->setText("Total: " + format.toCurrencyString(0.00));
+            }
           }else{
             QMessageBox::warning(this, QString::number(errors.size()) + " Error(s)", "Encountered " + QString::number(errors.size()) + " errors(s)");
           }
