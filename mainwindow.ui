@@ -311,6 +311,9 @@
    <property name="text">
     <string>All Transactions</string>
    </property>
+   <property name="shortcut">
+    <string>Ctrl+Shift+V</string>
+   </property>
   </action>
  </widget>
  <layoutdefault spacing="6" margin="11"/>

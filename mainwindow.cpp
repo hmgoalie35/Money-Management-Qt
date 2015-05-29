@@ -6,7 +6,7 @@
 #include <QFileInfo>
 #include <QFileDialog>
 #include <QTextStream>
-
+#include <QTableView>
 #define MESSAGE_DISPLAY_LENGTH 4000
 
 MainWindow::MainWindow(QWidget *parent) :
@@ -287,4 +287,27 @@ void MainWindow::on_actionDelete_triggered()
           ui->statusBar->showMessage("Error deleting database", MESSAGE_DISPLAY_LENGTH);
         }
     }
+}
+
+void MainWindow::on_actionAll_Transactions_triggered()
+{
+   QSqlQueryModel* model = new QSqlQueryModel;
+   open_database();
+   model->setQuery("SELECT description, mode, trans_amount, balance, date_added FROM transactions;", transaction_db);
+   model->setHeaderData(0, Qt::Horizontal, tr("Description"));
+   model->setHeaderData(1, Qt::Horizontal, tr("Mode"));
+   model->setHeaderData(2, Qt::Horizontal, tr("Transaction Amount"));
+   model->setHeaderData(3, Qt::Horizontal, tr("Resulting Balance"));
+   model->setHeaderData(4, Qt::Horizontal, tr("Date Added"));
+
+   QTableView* view = new QTableView;
+   view->setModel(model);
+   view->setWindowIcon(QIcon(":/imgs/money_management.gif"));
+   view->setWindowTitle("View All Transactions");
+   view->resizeRowsToContents();
+   view->resizeColumnsToContents();
+   //view->horizontalHeader()->setStretchLastSection(true);
+   view->setGeometry(this->x(), this->y(), 550, 350);
+   view->show();
+   close_database();
 }

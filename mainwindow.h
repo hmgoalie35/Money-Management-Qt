@@ -34,6 +34,8 @@ private slots:
 
   void on_actionDelete_triggered();
 
+  void on_actionAll_Transactions_triggered();
+
 private:
     Ui::MainWindow *ui;
     QSqlDatabase transaction_db;
