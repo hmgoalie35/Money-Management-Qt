@@ -6,6 +6,7 @@
 #include <QtSql>
 #include <QCloseEvent>
 #include <QTableView>
+#include <QSqlQueryModel>
 
 namespace Ui {
 class MainWindow;
@@ -48,6 +49,8 @@ private:
     QLocale format;
     QSqlTableModel* edit_trans_model;
     QTableView* edit_trans_view;
+    QTableView* view_all_transactions_view;
+    QSqlQueryModel* view_all_transactions_model;
 
 };
 

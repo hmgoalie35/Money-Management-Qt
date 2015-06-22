@@ -28,6 +28,8 @@ MainWindow::MainWindow(QWidget *parent) :
     qDebug() << "DB Path: " << db_path;
     edit_trans_model = NULL;
     edit_trans_view = NULL;
+    view_all_transactions_model = NULL;
+    view_all_transactions_view = NULL;
     
     setup_database();
     open_database();
@@ -185,6 +187,9 @@ void MainWindow::closeEvent(QCloseEvent* event){
         if(edit_trans_view != NULL){
             edit_trans_view->deleteLater();
         }
+        if(view_all_transactions_view != NULL){
+            view_all_transactions_view->deleteLater();
+        }
         event->accept();
     }else{
         qDebug() << "Not exiting, user selected no";
@@ -299,24 +304,24 @@ void MainWindow::on_actionDelete_triggered()
 
 void MainWindow::on_actionAll_Transactions_triggered()
 {
-    QSqlQueryModel* model = new QSqlQueryModel(this);
+    view_all_transactions_model = new QSqlQueryModel(this);
     open_database();
-    model->setQuery("SELECT description, mode, trans_amount, balance, date_added FROM transactions;", transaction_db);
-    model->setHeaderData(0, Qt::Horizontal, tr("Description"));
-    model->setHeaderData(1, Qt::Horizontal, tr("Mode"));
-    model->setHeaderData(2, Qt::Horizontal, tr("Transaction Amount"));
-    model->setHeaderData(3, Qt::Horizontal, tr("Resulting Balance"));
-    model->setHeaderData(4, Qt::Horizontal, tr("Date Added"));
+    view_all_transactions_model->setQuery("SELECT description, mode, trans_amount, balance, date_added FROM transactions;", transaction_db);
+    view_all_transactions_model->setHeaderData(0, Qt::Horizontal, tr("Description"));
+    view_all_transactions_model->setHeaderData(1, Qt::Horizontal, tr("Mode"));
+    view_all_transactions_model->setHeaderData(2, Qt::Horizontal, tr("Transaction Amount"));
+    view_all_transactions_model->setHeaderData(3, Qt::Horizontal, tr("Resulting Balance"));
+    view_all_transactions_model->setHeaderData(4, Qt::Horizontal, tr("Date Added"));
     
-    QTableView* view = new QTableView;
-    view->setModel(model);
-    view->setWindowIcon(QIcon(":/imgs/money_management.gif"));
-    view->setWindowTitle("View All Transactions");
-    view->resizeRowsToContents();
-    view->resizeColumnsToContents();
+    view_all_transactions_view = new QTableView;
+    view_all_transactions_view->setModel(view_all_transactions_model);
+    view_all_transactions_view->setWindowIcon(QIcon(":/imgs/money_management.gif"));
+    view_all_transactions_view->setWindowTitle("View All Transactions");
+    view_all_transactions_view->resizeRowsToContents();
+    view_all_transactions_view->resizeColumnsToContents();
     //view->horizontalHeader()->setStretchLastSection(true);
-    view->setGeometry(this->x(), this->y(), 550, 350);
-    view->show();
+    view_all_transactions_view->setGeometry(this->x(), this->y(), 550, 350);
+    view_all_transactions_view->show();
     close_database();
 }
 
