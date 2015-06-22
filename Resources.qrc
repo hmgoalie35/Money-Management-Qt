@@ -1,0 +1,7 @@
+<RCC>
+    <qresource prefix="/imgs">
+        <file>money_management.gif</file>
+        <file>money_management.ico</file>
+        <file>danger.png</file>
+    </qresource>
+</RCC>
