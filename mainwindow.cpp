@@ -9,6 +9,7 @@
 #include <QTableView>
 #include <QVector>
 
+//# of ms to display messages in status bar for.
 #define MESSAGE_DISPLAY_LENGTH 4000
 
 MainWindow::MainWindow(QWidget *parent) :
@@ -16,42 +17,60 @@ MainWindow::MainWindow(QWidget *parent) :
     ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
+    //setup window attributes
     setWindowIcon(QIcon(":/imgs/money_management.gif"));
     setWindowTitle("Money Management");
     setFixedSize(width(), height());
     ui->dateEdit->setDate(QDate::currentDate());
+    //add different modes to combo box
     ui->comboBoxMode->addItem("Deposit");
     ui->comboBoxMode->addItem("Withdraw");
+    //initially have nothing selected
     ui->comboBoxMode->setCurrentIndex(-1);
+    //only allow valid doubles for the deposit/withdrawal amt.
     ui->lineEditDepWithdr->setValidator(new QDoubleValidator(1, 10000000, 2, ui->lineEditDepWithdr));
+    //the directory where the database lives.
     db_path = QDir::currentPath() + "/transaction_db.db";
     qDebug() << "DB Path: " << db_path;
+    //init objects.
     edit_trans_model = NULL;
     edit_trans_view = NULL;
     view_all_transactions_model = NULL;
     view_all_transactions_view = NULL;
     
+    //sets up the database
     setup_database();
-    open_database();
-    QSqlQuery qry = transaction_db.exec("SELECT balance FROM transactions ORDER BY id DESC LIMIT 1;");
-    qDebug() << "Initial Setup Query Last Balance Status: " << qry.lastError();
-    if(qry.next()){
-        qDebug() << "Initially setting total label to: " << format.toCurrencyString(qry.value(0).toDouble());
-        ui->labelTotal->setText("Total: " + format.toCurrencyString(qry.value(0).toDouble()));
-    }else{
-        qDebug() << "Initially setting total label to: " << format.toCurrencyString(0.00);
-        ui->labelTotal->setText("Total: " + format.toCurrencyString(0.00));
-    }
-    close_database();
     
+    //query database to get last transaction's balance and set the total label.
+    ui->labelTotal->setText("Total: " + format.toCurrencyString(get_last_transaction_balance()));
 }
 
+double MainWindow::get_last_transaction_balance(){
+    //queries the database for the last known balance and sets the total label accordingly.
+    open_database();
+    double result = 0;
+    QSqlQuery qry = transaction_db.exec("SELECT balance FROM transactions ORDER BY id DESC LIMIT 1;");
+    qDebug() << "Last Balance Query Status: " << qry.lastError();
+    if(qry.next()){
+        result = qry.value(0).toDouble();
+    }else{
+        result = 0;
+    }
+    close_database();
+    return result;
+}
+
+//free memory
 MainWindow::~MainWindow()
 {
-    //    QDir d;
-    //    d.remove(db_path);
     delete ui;
 }
+
+/*
+ * Sets up the sqlite database
+ * creates db file if doesn't exist, and creates the necessary table(s)
+ * 
+*/
 void MainWindow::setup_database(){
     transaction_db = QSqlDatabase::addDatabase("QSQLITE");
     transaction_db.setDatabaseName(db_path);
@@ -81,6 +100,9 @@ void MainWindow::setup_database(){
     close_database();
 }
 
+/*
+ * Opens the database for reading/writing.
+*/
 bool MainWindow::open_database(){
     bool status = transaction_db.open();
     if(status){
@@ -99,16 +121,27 @@ bool MainWindow::open_database(){
     return status;
 }
 
+/*
+ * Closes the database
+*/
 void MainWindow::close_database(){
     //  bool status = transaction_db.commit();
     //  qDebug() << "Closing database: " << status;
     transaction_db.close();
 }
 
+
 void MainWindow::on_actionAbout_triggered()
 {
 }
 
+/*
+ * Triggered when the user is adding a new transaction
+ * Checks to make sure an amount, mode and description were provided, otherwise throws error
+ * Checks to make sure a withdrawal is not more than the current balance
+ * Adds the transaction to the database if all is well
+ * 
+*/
 void MainWindow::on_pushButtonSubmit_clicked()
 {
     if(!open_database()){
@@ -125,18 +158,11 @@ void MainWindow::on_pushButtonSubmit_clicked()
         qDebug() << "Invalid Input\nAmount: " << amount << " Description: " << description << " Mode: " << mode;
         return;
     }
-    QSqlQuery last_trans = transaction_db.exec("SELECT balance FROM transactions ORDER BY id DESC LIMIT 1;");
-    qDebug() << "Get last balance qry psh btn submit clicked status: " << last_trans.lastError();
-    double last_balance = 0;
-    if(last_trans.next()){
-        qDebug() << "Checking last known balance (this should print once)";
-        last_balance = last_trans.value(0).toDouble();
-    }
+    double last_balance = get_last_transaction_balance();
     qDebug() << "last known balance (submit btn pressed): " << last_balance;
     if(mode == "Deposit"){
         qDebug() << "Depositing " << amount << " to " << last_balance;
         last_balance += amount;
-        ui->labelTotal->setText("Total: " + format.toCurrencyString(last_balance));
     }else if(mode == "Withdraw"){
         qDebug() << "Withdrawing " << amount << " from " << last_balance;
         if(last_balance - amount < 0){
@@ -145,7 +171,6 @@ void MainWindow::on_pushButtonSubmit_clicked()
             return;
         }
         last_balance -= amount;
-        ui->labelTotal->setText("Total: " + format.toCurrencyString(last_balance));
     }
     QSqlQuery add_transaction_qry;
     add_transaction_qry.prepare("INSERT INTO transactions (description, mode, trans_amount, balance, date_added) VALUES (:desc, :mode, :trans_amount, :balance, :date);");
@@ -163,6 +188,7 @@ void MainWindow::on_pushButtonSubmit_clicked()
         ui->comboBoxMode->setCurrentIndex(-1);
         ui->pushButtonSubmit->setEnabled(false);
         QTimer::singleShot(1750, this, SLOT(reenable_submit_btn()));
+        ui->labelTotal->setText("Total: " + format.toCurrencyString(last_balance));        
         qDebug() << "Transaction saved";
     }else{
         ui->statusBar->showMessage("Error saving transaction", MESSAGE_DISPLAY_LENGTH);
@@ -171,19 +197,30 @@ void MainWindow::on_pushButtonSubmit_clicked()
     close_database();
 }
 
+/*
+ * This function re-enables the submit button after a specified amount of seconds to prevent from spamming the submit button.
+ */
 void MainWindow::reenable_submit_btn(){
     ui->pushButtonSubmit->setEnabled(true);
 }
 
+/*
+ * Calls the close function which is handled by the closeEvent function
+ * Triggered when the Quit menu item is selected or ctrl + q
+ */
 void MainWindow::on_actionQuit_triggered()
 {
     this->close();
     
 }
+
+/*
+ * Triggered when the main window is closing
+ * Prompts user to quit, if yes checks to see if any other windows are open and deletes them.
+*/
 void MainWindow::closeEvent(QCloseEvent* event){
     int result = QMessageBox::question(NULL, "Quit?", "Are you sure you want to quit?");
     if(result == QMessageBox::Yes){
-        qDebug() << "Exiting, user selected yes";
         if(edit_trans_view != NULL){
             edit_trans_view->deleteLater();
         }
@@ -192,11 +229,15 @@ void MainWindow::closeEvent(QCloseEvent* event){
         }
         event->accept();
     }else{
-        qDebug() << "Not exiting, user selected no";
         event->ignore();
     }
 }
 
+/*
+ * Exports whatever is currently in the database to a file with a .sql extension
+ * Used for backups, etc.
+ * User is prompted via a file dialog
+*/
 void MainWindow::on_actionExport_triggered()
 {
     QString filename = QFileDialog::getSaveFileName(this, tr("Export Database"), QDir::currentPath(), tr("Sql File (*.sql)"));
@@ -227,9 +268,9 @@ void MainWindow::on_actionExport_triggered()
         export_file.write("PRAGMA foreign_keys=OFF;\n");
         export_file.write("BEGIN TRANSACTION;\n");
         export_file.write("CREATE TABLE transactions(id INTEGER PRIMARY KEY AUTOINCREMENT, description TEXT, mode TEXT, trans_amount DOUBLE, balance DOUBLE, date_added DATE);\n");
-        //need to add error checking for 0 transactions.
+        QString write_str;
         while(get_all_transactions_qry.next()){
-            QString write_str = "INSERT INTO transactions (id, description, mode, trans_amount, balance, date_added) VALUES (" + get_all_transactions_qry.value(0).toString() + ", '" + get_all_transactions_qry.value(1).toString() + "', '" + get_all_transactions_qry.value(2).toString() + "', " + get_all_transactions_qry.value(3).toString() + ", " + get_all_transactions_qry.value(4).toString() + ", '" + get_all_transactions_qry.value(5).toString() + "');\n";
+            write_str = "INSERT INTO transactions (id, description, mode, trans_amount, balance, date_added) VALUES (" + get_all_transactions_qry.value(0).toString() + ", '" + get_all_transactions_qry.value(1).toString() + "', '" + get_all_transactions_qry.value(2).toString() + "', " + get_all_transactions_qry.value(3).toString() + ", " + get_all_transactions_qry.value(4).toString() + ", '" + get_all_transactions_qry.value(5).toString() + "');\n";
             qDebug() << "Writing " << write_str;
             export_file.write(write_str.toUtf8());
             count++;
@@ -243,12 +284,16 @@ void MainWindow::on_actionExport_triggered()
     }
 }
 
+/*
+ * Triggered when user wants to import a database.
+ * Drops the current table, overwrites w/ new queries
+*/
 void MainWindow::on_actionImport_triggered()
 {
     QString filename = QFileDialog::getOpenFileName(this, tr("Import Database"), QDir::currentPath(), tr("Sql File (*.sql)"));
     if(!filename.isEmpty()){
         
-        //@TODO -- auto backup the datbase? -- create backups folder...
+        //@TODO -- auto backup the database? -- create backups folder...
         int choice = QMessageBox::question(this, "Overwrite existing data?", "This action will overwrite any existing data, are you sure you want to continue?");
         if(choice == QMessageBox::Yes){
             open_database();
@@ -286,9 +331,12 @@ void MainWindow::on_actionImport_triggered()
     }
 }
 
+/*
+ * Deletes the current table from the database
+*/
 void MainWindow::on_actionDelete_triggered()
 {
-    int choice = QMessageBox::question(this, "Are you sure?", "Are you sure you want to delete the entire database? This cannot be undone");
+    int choice = QMessageBox::question(this, "Are you sure?", "Are you sure you want to delete the entire database? This cannot be undone.");
     if(choice == QMessageBox::Yes){
         open_database();
         QSqlQuery remove_all_records_qry = transaction_db.exec("DELETE FROM transactions;");
@@ -302,6 +350,9 @@ void MainWindow::on_actionDelete_triggered()
     }
 }
 
+/*
+ * Displays all of the transactions in the database to the user in Read-Only mode
+*/
 void MainWindow::on_actionAll_Transactions_triggered()
 {
     view_all_transactions_model = new QSqlQueryModel(this);
@@ -325,6 +376,11 @@ void MainWindow::on_actionAll_Transactions_triggered()
     close_database();
 }
 
+/*
+ * Triggered when the user wants to edit a transaction(s)
+ * The user editing data will send a signal dataChanged which is caught by the slot record_changed, this function handles everything.
+ * Displays all transactions from the database, Read/Write
+*/
 void MainWindow::on_actionTransaction_triggered()
 {
     edit_trans_model = new QSqlTableModel(this, transaction_db);
@@ -351,26 +407,19 @@ void MainWindow::on_actionTransaction_triggered()
     edit_trans_view->show();
     
     connect(edit_trans_model, SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(record_changed(QModelIndex,QModelIndex)));
-    
-    //get selected row and do manipulation on it...
-    //need to update every transaction's balance...
-    //select all records w/ id > currently changed record. Need to account for if deposit/withdrawal. then update accordingly.
-    
-    //only allows changing of desc and date_added?
-    
-    //allow user to delete a transaction see below
-    //http://www.qtforum.org/article/14578/how-can-i-get-the-current-selected-row-in-a-qsqltablemodel.html
-    
-    //  QItemSelectionModel *selmodel = tableview->selectionModel();
-    //  QModelIndex current = selmodel->currentIndex(); // the "current" item
-    
-    //  close_database();
+    //    close_database();
 }
 
+/*
+ * Handles error checking and updating for the columns that can be edited
+ * Quite cumbersome
+*/
 void MainWindow::record_changed(QModelIndex index_1, QModelIndex index_2){
     Q_UNUSED (index_2);
+    //every single time a record is changed, whether by the user or programatically, this function would be called. Since we are using setdata a bunch
+    //we tempororaily prevent the connection b/w these. The connection is restored at the end of this function
     disconnect(edit_trans_model, SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(record_changed(QModelIndex,QModelIndex)));
-        
+    
     /* column 0 = id
    * column 1 = descrip
    * column 2 = mode

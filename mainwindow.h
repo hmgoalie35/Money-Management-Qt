@@ -53,7 +53,7 @@ private slots:
     //called whenever a database row is altered and handles the change.
     void record_changed(QModelIndex,QModelIndex);
     
-    //setups the database for the life of the program
+    //sets up the database for the life of the program
     void setup_database();
     
     //opens the database so writing/reading can occur
@@ -64,6 +64,9 @@ private slots:
     
     //called when the program closes (via keyboard shortcut, menu item or the X button
     void closeEvent(QCloseEvent*);  
+    
+    //queries the database for the last balance, and sets the balance label.
+    double get_last_transaction_balance();
     
 private:
     Ui::MainWindow *ui;
@@ -84,6 +87,24 @@ private:
     //used to display database rows/columns for viewing only.
     QTableView* view_all_transactions_view;
     QSqlQueryModel* view_all_transactions_model;
+    
+    
+    
+    /* column 0 = id
+   * column 1 = descrip
+   * column 2 = mode
+   * column 3 = trans amount
+   * column 4 = balance
+   * column 5 = date added
+  */
+    enum Column{
+        ID,
+        DESCRIPTION,
+        MODE,
+        TRANSACTION_AMOUNT,
+        BALANCE,
+        DATA_ADDED
+    };
     
 };
 
