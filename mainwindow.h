@@ -7,6 +7,7 @@
 #include <QCloseEvent>
 #include <QTableView>
 #include <QSqlQueryModel>
+#include "Logger.h"
 
 namespace Ui {
 class MainWindow;
@@ -88,7 +89,8 @@ private:
     QTableView* view_all_transactions_view;
     QSqlQueryModel* view_all_transactions_model;
     
-    
+    //global logger object.
+    Logger * logger;
     
     /* column 0 = id
    * column 1 = descrip

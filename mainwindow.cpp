@@ -16,6 +16,7 @@ MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow)
 {
+    logger = new Logger();
     ui->setupUi(this);
     //setup window attributes
     setWindowIcon(QIcon(":/imgs/money_management.gif"));
@@ -31,18 +32,19 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->lineEditDepWithdr->setValidator(new QDoubleValidator(1, 10000000, 2, ui->lineEditDepWithdr));
     //the directory where the database lives.
     db_path = QDir::currentPath() + "/transaction_db.db";
-    qDebug() << "DB Path: " << db_path;
+    logger->log(Logger::DEBUG, "DB Path: " + db_path);    
     //init objects.
     edit_trans_model = NULL;
     edit_trans_view = NULL;
     view_all_transactions_model = NULL;
     view_all_transactions_view = NULL;
-    
     //sets up the database
     setup_database();
     
     //query database to get last transaction's balance and set the total label.
-    ui->labelTotal->setText("Total: " + format.toCurrencyString(get_last_transaction_balance()));
+    double last_balance = get_last_transaction_balance();
+    ui->labelTotal->setText("Total: " + format.toCurrencyString(last_balance));
+    logger->log(Logger::DEBUG, "Setting initial total to: " + format.toCurrencyString(last_balance));
 }
 
 double MainWindow::get_last_transaction_balance(){
@@ -50,7 +52,7 @@ double MainWindow::get_last_transaction_balance(){
     open_database();
     double result = 0;
     QSqlQuery qry = transaction_db.exec("SELECT balance FROM transactions ORDER BY id DESC LIMIT 1;");
-    qDebug() << "Last Balance Query Status: " << qry.lastError();
+    logger->log(Logger::DEBUG, "Get last transaction balance qry", qry.lastError().text());
     if(qry.next()){
         result = qry.value(0).toDouble();
     }else{
@@ -63,6 +65,8 @@ double MainWindow::get_last_transaction_balance(){
 //free memory
 MainWindow::~MainWindow()
 {
+    logger->log(Logger::DEBUG, "freeing memory");
+    delete logger;
     delete ui;
 }
 
@@ -72,15 +76,16 @@ MainWindow::~MainWindow()
  * 
 */
 void MainWindow::setup_database(){
+    logger->log(Logger::DEBUG, "Setting up database");
     transaction_db = QSqlDatabase::addDatabase("QSQLITE");
     transaction_db.setDatabaseName(db_path);
     QFileInfo db_info(db_path);
     bool exists = db_info.exists();
+    logger->log(Logger::DEBUG, "Database exists: " + (exists ? QString("True") : QString("False")));    
     bool status = transaction_db.open();
-    qDebug() << "DB Exists: " << exists;
-    qDebug() << "DB Opened Successfully: " << status;
+    logger->log(Logger::DEBUG, "Database open status: " + (status ? QString("True") : QString("False")));        
     if(!status){
-        qDebug() << "Error connecting to database (setup_database)";
+        logger->log(Logger::CRITICAL, "Failed to open database");            
         ui->statusBar->showMessage("Error connecting to database", MESSAGE_DISPLAY_LENGTH);
         QMessageBox::critical(this, "Error Connecting To Database", "Error opening database, please restart the program");
         ui->lineEditDepWithdr->setEnabled(false);
@@ -91,11 +96,12 @@ void MainWindow::setup_database(){
         ui->menuBar->setEnabled(false);
         return;
     }
+    logger->log(Logger::DEBUG, "Succcessfully connected");
     ui->statusBar->showMessage("Connected...", MESSAGE_DISPLAY_LENGTH);
     if(!exists){
-        qDebug() << "Creating transaction table";
+        logger->log(Logger::DEBUG, "Creating transaction table");
         QSqlQuery create_transaction_table_qry = transaction_db.exec("CREATE TABLE transactions(id INTEGER PRIMARY KEY AUTOINCREMENT, description TEXT, mode TEXT, trans_amount DOUBLE, balance DOUBLE, date_added DATE);");
-        qDebug() << "Create Trans Table Status: " << create_transaction_table_qry.lastError();
+        logger->log(Logger::DEBUG, "Create trans table qry" ,create_transaction_table_qry.lastError().text());
     }
     close_database();
 }
@@ -106,9 +112,10 @@ void MainWindow::setup_database(){
 bool MainWindow::open_database(){
     bool status = transaction_db.open();
     if(status){
+        logger->log(Logger::DEBUG, "Connected to database");
         ui->statusBar->showMessage("Connected...", MESSAGE_DISPLAY_LENGTH);
     }else{
-        qDebug() << "Error opening database";
+        logger->log(Logger::CRITICAL, "Error opening database");
         ui->statusBar->showMessage("Error connecting to database", MESSAGE_DISPLAY_LENGTH);
         QMessageBox::critical(this, "Error Connecting To Database", "Error opening database, please restart the program");
         ui->lineEditDepWithdr->setEnabled(false);
@@ -126,7 +133,7 @@ bool MainWindow::open_database(){
 */
 void MainWindow::close_database(){
     //  bool status = transaction_db.commit();
-    //  qDebug() << "Closing database: " << status;
+    logger->log(Logger::DEBUG, "Closing database");
     transaction_db.close();
 }
 
@@ -146,7 +153,7 @@ void MainWindow::on_pushButtonSubmit_clicked()
 {
     if(!open_database()){
         QMessageBox::critical(this, "Error Saving Transaction", "Error saving the transaction, please try again");
-        qDebug() << "Error connecting to database (submit button)\n Transaction not saved";
+        logger->log(Logger::CRITICAL, "Error opening database to save new transaction (submit btn). Transaction not saved");
         return;
     }
     QString description = ui->lineEditDescription->text();
@@ -155,16 +162,16 @@ void MainWindow::on_pushButtonSubmit_clicked()
     
     if(amount == 0 || description == "" || mode == ""){
         QMessageBox::critical(this, "Invalid Input", "Please provide a description, amount and if this transaction is a deposit or withdrawal.");
-        qDebug() << "Invalid Input\nAmount: " << amount << " Description: " << description << " Mode: " << mode;
+        logger->log(Logger::DEBUG, "Invalid Input\nAmount: " + QString::number(amount) + " Description: " + description + " Mode: " + mode);
         return;
     }
     double last_balance = get_last_transaction_balance();
-    qDebug() << "last known balance (submit btn pressed): " << last_balance;
+    logger->log(Logger::DEBUG, "Last known balance (submit btn) " + QString::number(last_balance));
     if(mode == "Deposit"){
-        qDebug() << "Depositing " << amount << " to " << last_balance;
+        logger->log(Logger::DEBUG, "Depositing " + QString::number(amount) + " to " + QString::number(last_balance));
         last_balance += amount;
     }else if(mode == "Withdraw"){
-        qDebug() << "Withdrawing " << amount << " from " << last_balance;
+        logger->log(Logger::DEBUG, "Withdrawing " + QString::number(amount) + " from " + QString::number(last_balance));        
         if(last_balance - amount < 0){
             qDebug() << "Can't withdraw " << amount << " from " << last_balance;
             QMessageBox::information(this, "Insufficient Funds", "There is not enough money to withdraw " + format.toCurrencyString(amount));
@@ -180,7 +187,7 @@ void MainWindow::on_pushButtonSubmit_clicked()
     add_transaction_qry.bindValue(":balance", last_balance);
     add_transaction_qry.bindValue(":date", ui->dateEdit->date());
     bool result = add_transaction_qry.exec();
-    qDebug() << "Add transaction status: " << add_transaction_qry.lastError();
+    logger->log(Logger::DEBUG, "add transaction qry", add_transaction_qry.lastError().text());
     if(result){
         ui->statusBar->showMessage("Transaction saved", MESSAGE_DISPLAY_LENGTH);
         ui->lineEditDepWithdr->setText("");
@@ -188,11 +195,11 @@ void MainWindow::on_pushButtonSubmit_clicked()
         ui->comboBoxMode->setCurrentIndex(-1);
         ui->pushButtonSubmit->setEnabled(false);
         QTimer::singleShot(1750, this, SLOT(reenable_submit_btn()));
-        ui->labelTotal->setText("Total: " + format.toCurrencyString(last_balance));        
-        qDebug() << "Transaction saved";
+        ui->labelTotal->setText("Total: " + format.toCurrencyString(last_balance));   
+        logger->log(Logger::DEBUG, "Transaction saved");
     }else{
         ui->statusBar->showMessage("Error saving transaction", MESSAGE_DISPLAY_LENGTH);
-        qDebug() << "Error saving transaction";
+        logger->log(Logger::CRITICAL, "Error saving transaction");
     }
     close_database();
 }
@@ -222,11 +229,14 @@ void MainWindow::closeEvent(QCloseEvent* event){
     int result = QMessageBox::question(NULL, "Quit?", "Are you sure you want to quit?");
     if(result == QMessageBox::Yes){
         if(edit_trans_view != NULL){
+            logger->log(Logger::DEBUG, "Closing edit trans view");
             edit_trans_view->deleteLater();
         }
         if(view_all_transactions_view != NULL){
+            logger->log(Logger::DEBUG, "Closing view trans view");            
             view_all_transactions_view->deleteLater();
         }
+        logger->log(Logger::DEBUG, "Closing main window & quitting...");        
         event->accept();
     }else{
         event->ignore();
@@ -244,24 +254,25 @@ void MainWindow::on_actionExport_triggered()
     if(!filename.isEmpty()){
         open_database();
         QSqlQuery transactions_exist_qry = transaction_db.exec("SELECT count(id) FROM transactions;");
-        qDebug() << "Transactions exist qry status " << transactions_exist_qry.lastError();
+        logger->log(Logger::DEBUG, "transactions exist qry", transactions_exist_qry.lastError().text());
         if(transactions_exist_qry.next()){
             if(transactions_exist_qry.value(0) <=0){
-                qDebug() << "there are no transactions to export";
+                logger->log(Logger::DEBUG, "There are no transactions to export");
                 QMessageBox::information(this, "No Transactions Exist", "There are no transactions to export, export cancelled");
                 return;
             }
         }else{
-            qDebug() << "there are no transactions to export";
+            logger->log(Logger::DEBUG, "There are no transactions to export");            
             QMessageBox::information(this, "No Transactions Exist", "There are no transactions to export, export cancelled");
             return;
         }
-        qDebug() << "transactions exist, go ahead and export";
+        logger->log(Logger::DEBUG, "transactions exist, continuing w/ export");        
         QSqlQuery get_all_transactions_qry = transaction_db.exec("SELECT id, description, mode, trans_amount, balance, date_added FROM transactions;");
-        qDebug() << "Get all transactions for export status: " << get_all_transactions_qry.lastError();
+        logger->log(Logger::DEBUG, "Get all transactions for export qry", get_all_transactions_qry.lastError().text());
         int count = 0;
         QFile export_file(filename);
         if(!export_file.open(QFile::WriteOnly)){
+            logger->log(Logger::CRITICAL, "Error opening " + filename + " for export");
             QMessageBox::information(this, "Error Opening File", "Error opening " + filename + " for export, please try again");
             return;
         }
@@ -271,13 +282,13 @@ void MainWindow::on_actionExport_triggered()
         QString write_str;
         while(get_all_transactions_qry.next()){
             write_str = "INSERT INTO transactions (id, description, mode, trans_amount, balance, date_added) VALUES (" + get_all_transactions_qry.value(0).toString() + ", '" + get_all_transactions_qry.value(1).toString() + "', '" + get_all_transactions_qry.value(2).toString() + "', " + get_all_transactions_qry.value(3).toString() + ", " + get_all_transactions_qry.value(4).toString() + ", '" + get_all_transactions_qry.value(5).toString() + "');\n";
-            qDebug() << "Writing " << write_str;
+            logger->log(Logger::DEBUG, "Writing " + write_str);
             export_file.write(write_str.toUtf8());
             count++;
         }
         export_file.write("COMMIT;");
         QMessageBox::information(this, "Success", QString::number(count) + " transactions exported to " + filename);
-        qDebug() << count << " transactions written to " << filename;
+        logger->log(Logger::DEBUG, QString(count) + " transactions written to " + filename);
         export_file.flush();
         export_file.close();
         close_database();
@@ -296,11 +307,13 @@ void MainWindow::on_actionImport_triggered()
         //@TODO -- auto backup the database? -- create backups folder...
         int choice = QMessageBox::question(this, "Overwrite existing data?", "This action will overwrite any existing data, are you sure you want to continue?");
         if(choice == QMessageBox::Yes){
+            logger->log(Logger::DEBUG, "Overwriting database via import");
             open_database();
             QSqlQuery drop_table_qry = transaction_db.exec("DROP TABLE transactions;");
-            qDebug() << "drop table qry result: " << drop_table_qry.lastError();
+            logger->log(Logger::DEBUG, "drop table for import qry", drop_table_qry.lastError().text());
             QFile import_file(filename);
             if(!import_file.open(QFile::ReadOnly)){
+                logger->log(Logger::CRITICAL, "Error opening " + filename + " for import");
                 QMessageBox::information(this, "Error Opening File", "Error opening " + filename + " for import, please try again");
                 return;
             }
@@ -309,20 +322,19 @@ void MainWindow::on_actionImport_triggered()
             while(!in.atEnd()){
                 QString statement = in.readLine();
                 QSqlQuery qry = transaction_db.exec(statement);
+                logger->log(Logger::DEBUG, "import qry", qry.lastError().text());
                 if(qry.lastError().text() != " "){
                     errors.push_back("Error: " + qry.lastError().text() + "\nStatement: " + statement);
-                    qDebug() << "Error: " << qry.lastError() << "\nStatement: " << statement;
+                    logger->log(Logger::CRITICAL, "Error on statement " + statement);
                 }
             }
             if(errors.empty()){
+                logger->log(Logger::DEBUG, "All data successfully imported");
                 QMessageBox::information(this, "Success", "All data successfully imported");
-                QSqlQuery qry = transaction_db.exec("SELECT balance FROM transactions ORDER BY id DESC LIMIT 1;");
-                if(qry.next()){
-                    ui->labelTotal->setText("Total: " + format.toCurrencyString(qry.value(0).toDouble()));
-                }else{
-                    ui->labelTotal->setText("Total: " + format.toCurrencyString(0.00));
-                }
+                double last_balance = get_last_transaction_balance();
+                ui->labelTotal->setText("Total: " + format.toCurrencyString(last_balance));
             }else{
+                logger->log(Logger::DEBUG, QString::number(errors.size()) + " error(s) encountered");
                 QMessageBox::warning(this, QString::number(errors.size()) + " Error(s)", "Encountered " + QString::number(errors.size()) + " errors(s)");
             }
             import_file.close();
@@ -340,11 +352,13 @@ void MainWindow::on_actionDelete_triggered()
     if(choice == QMessageBox::Yes){
         open_database();
         QSqlQuery remove_all_records_qry = transaction_db.exec("DELETE FROM transactions;");
-        qDebug() << "drop table qry result: " << remove_all_records_qry.lastError();
+        logger->log(Logger::DEBUG, "drop table delete db qry" + remove_all_records_qry.lastError().text());
         close_database();
         if(remove_all_records_qry.lastError().text() == " "){
+            logger->log(Logger::DEBUG, "Database sucessfully deleted");
             ui->statusBar->showMessage("Database successfully deleted", MESSAGE_DISPLAY_LENGTH);
         }else{
+            logger->log(Logger::DEBUG, "Error deleting database");            
             ui->statusBar->showMessage("Error deleting database", MESSAGE_DISPLAY_LENGTH);
         }
     }
@@ -355,6 +369,7 @@ void MainWindow::on_actionDelete_triggered()
 */
 void MainWindow::on_actionAll_Transactions_triggered()
 {
+    logger->log(Logger::DEBUG, "Viewing all transactions");
     view_all_transactions_model = new QSqlQueryModel(this);
     open_database();
     view_all_transactions_model->setQuery("SELECT description, mode, trans_amount, balance, date_added FROM transactions;", transaction_db);
@@ -383,6 +398,7 @@ void MainWindow::on_actionAll_Transactions_triggered()
 */
 void MainWindow::on_actionTransaction_triggered()
 {
+    logger->log(Logger::DEBUG, "Editing all transactions");
     edit_trans_model = new QSqlTableModel(this, transaction_db);
     open_database();
     edit_trans_model->setTable("transactions");
@@ -407,7 +423,6 @@ void MainWindow::on_actionTransaction_triggered()
     edit_trans_view->show();
     
     connect(edit_trans_model, SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(record_changed(QModelIndex,QModelIndex)));
-    //    close_database();
 }
 
 /*
@@ -432,8 +447,10 @@ void MainWindow::record_changed(QModelIndex index_1, QModelIndex index_2){
     switch (index_1.column()) {
     case 1:{
         if(edit_trans_model->submitAll()){
+            logger->log(Logger::DEBUG, "description updated");            
             QMessageBox::information(edit_trans_view, "Success", "Description successfully updated");
         }else{
+            logger->log(Logger::DEBUG, "error updating description");            
             QMessageBox::warning(edit_trans_view, "Error", "Error updating description, please try again");
         }
         break;
@@ -442,6 +459,7 @@ void MainWindow::record_changed(QModelIndex index_1, QModelIndex index_2){
         if(changed_data.toString() == "Deposit" || changed_data.toString() == "Withdraw"){
             choice = QMessageBox::question(edit_trans_view, "Update Subsequent Transactions?", "All subsequent transactions will have their balances updated to reflect this change, continue?");
             if(choice == QMessageBox::Yes){
+                logger->log(Logger::DEBUG, "updating mode");                
                 double new_balance = edit_trans_model->data(edit_trans_model->index(index_1.row(), 4)).toDouble();
                 QString mode = edit_trans_model->data(edit_trans_model->index(index_1.row(), 2)).toString();
                 bool negative_result = false;
@@ -449,7 +467,6 @@ void MainWindow::record_changed(QModelIndex index_1, QModelIndex index_2){
                 for(int i = index_1.row(); i < edit_trans_model->rowCount(); i++){
                     negative_result = false;
                     double trans_amount = edit_trans_model->data(edit_trans_model->index(i, 3)).toDouble();
-                    qDebug() << "pb: " << new_balance << " ta: " << trans_amount;
                     if(changed_data.toString() == "Deposit"){
                         //withdraw -> deposit.
                         if(i == index_1.row()){
@@ -460,17 +477,18 @@ void MainWindow::record_changed(QModelIndex index_1, QModelIndex index_2){
                             }else{
                                 if(new_balance - trans_amount < 0){
                                     QMessageBox::information(edit_trans_view, "Error", "Resulting calculation is negative, reverting all changes...");
+                                    logger->log(Logger::DEBUG, "resulting calculation negative, reverting all");                                    
                                     negative_result = true;
                                     break;
                                 }
                                 new_balance -= trans_amount;
                             }
                         }
-                        qDebug() << "deposit result: " << new_balance;
                         //deposit -> withdraw
                     }else{
                         if(i == index_1.row()){
                             if(new_balance - (2 * trans_amount) < 0){
+                                logger->log(Logger::DEBUG, "resulting calculation negative, reverting all");                                
                                 QMessageBox::information(edit_trans_view, "Error", "Resulting calculation is negative, reverting all changes...");
                                 negative_result = true;
                                 break;
@@ -481,15 +499,14 @@ void MainWindow::record_changed(QModelIndex index_1, QModelIndex index_2){
                                 new_balance += trans_amount;
                             }else{
                                 if(new_balance - trans_amount < 0){
+                                    logger->log(Logger::DEBUG, "resulting calculation negative, reverting all");                                    
                                     QMessageBox::information(edit_trans_view, "Error", "Resulting calculation is negative, reverting all changes...");
-                                    qDebug() << "here: " << i;
                                     negative_result = true;
                                     break;
                                 }
                                 new_balance -= trans_amount;
                             }
                         }
-                        qDebug() << "withdr result: " << new_balance;
                     }
                     
                     results.append(new_balance);
@@ -502,17 +519,18 @@ void MainWindow::record_changed(QModelIndex index_1, QModelIndex index_2){
                 }
                 if(!negative_result){
                     //write to db.
-                    qDebug() << "valid: " << (results.size() == (edit_trans_model->rowCount()-index_1.row()));
                     for(int i = index_1.row(); i < results.size(); i++){
                         QModelIndex index = edit_trans_model->index(i, 4, QModelIndex());
-                        edit_trans_model->setData(index, results[i]);
-                        qDebug() << "setting row: " << i << "'s balance to " << results[i];
+                        bool result = edit_trans_model->setData(index, results[i]);
+                        logger->log(Logger::DEBUG, "update mode: " + (result ? QString("True") : QString("False")));                                
                     }
                     
                     //error checking
-                    edit_trans_model->submitAll();
+                    bool result = edit_trans_model->submitAll();
+                    logger->log(Logger::DEBUG, "submit all mode changes: " + (result ? QString("True") : QString("False")));                                                    
                 }else{
                     if(edit_trans_model->isDirty()){
+                        logger->log(Logger::DEBUG, "resulting calculation negative reverting all changes");
                         QMessageBox::information(edit_trans_view, "Error", "Resulting calculation is negative, reverting all changes...");                        
                         edit_trans_model->revertAll();
                     }
@@ -522,15 +540,16 @@ void MainWindow::record_changed(QModelIndex index_1, QModelIndex index_2){
                 edit_trans_model->revertRow(index_1.row());
             }
         }else{
+            logger->log(Logger::DEBUG, changed_data.toString() + " is not a valid mode");
             QMessageBox::information(edit_trans_view, "Invalid Mode", changed_data.toString() + " is not a valid mode \nChoose from [Deposit, Withdraw] (case-sensitive)");
             edit_trans_model->revertRow(index_1.row());
         }
-        qDebug() << "quitting...";
         break;
     }
     case 3:{
         double new_amount = changed_data.toDouble();
         if(new_amount <= 0){
+            logger->log(Logger::DEBUG, "invalid input editing trans amount");
             QMessageBox::information(edit_trans_view, "Invalid Input" , "Input must be greater than zero!");
             edit_trans_model->revertRow(index_1.row());
             break;
@@ -578,23 +597,25 @@ void MainWindow::record_changed(QModelIndex index_1, QModelIndex index_2){
         }
         
         if(negative_result){
+            logger->log(Logger::DEBUG, "resulting calculation is negative, reverting all changes");
             if(edit_trans_model->isDirty()){
                 edit_trans_model->revertAll();
             }
             QMessageBox::information(edit_trans_view, "Error", "Resulting calculation is negative, reverting all changes...");                
         }else{
             QModelIndex index = edit_trans_model->index(index_1.row(), 3, QModelIndex());
-            edit_trans_model->setData(index, new_amount);
-            qDebug() << "setting row: " << index_1.row()+1 << " new amt to " << new_amount;
+            bool result = edit_trans_model->setData(index, new_amount);
+            logger->log(Logger::DEBUG, "update trans amount: " + (result ? QString("True") : QString("False")));                                            
             int i = index_1.row();
             while(!results.empty()){
                 QModelIndex index = edit_trans_model->index(i, 4, QModelIndex());
-                edit_trans_model->setData(index, results.front());
-                qDebug() << "setting row: " << (i+1) << "'s balance to " << results.front();
+                bool result = edit_trans_model->setData(index, results.front());
+                logger->log(Logger::DEBUG, "update balances after editing trans amount: " + (result ? QString("True") : QString("False")));                                                
                 results.pop_front();
                 i++;
             }
-            edit_trans_model->submitAll();
+            bool status = edit_trans_model->submitAll();
+            logger->log(Logger::DEBUG, "submitting all editing trans amount status: " + (status ? QString("True") : QString("False")));                                            
             ui->labelTotal->setText("Total: " + format.toCurrencyString(new_balance));
         }
         break;
@@ -605,11 +626,14 @@ void MainWindow::record_changed(QModelIndex index_1, QModelIndex index_2){
     case 5:{
         if(changed_data.toDate().isValid()){
             if(edit_trans_model->submitAll()){
+                logger->log(Logger::DEBUG, "date successfully updated");
                 QMessageBox::information(edit_trans_view, "Success", "Date successfully updated");
             }else{
+                logger->log(Logger::DEBUG, "error updating date");
                 QMessageBox::warning(edit_trans_view, "Error", "Error updating date, please try again");
             }
         }else{
+            logger->log(Logger::DEBUG, "invalid date " + changed_data.toString());
             QMessageBox::information(edit_trans_view, "Invalid Date", changed_data.toString() + " is not a valid date");
             edit_trans_model->revertRow(index_1.row());
         }
@@ -618,6 +642,7 @@ void MainWindow::record_changed(QModelIndex index_1, QModelIndex index_2){
     default:{
         break;
     }
-    }  
-    connect(edit_trans_model, SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(record_changed(QModelIndex,QModelIndex)));        
+    }
+    connect(edit_trans_model, SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(record_changed(QModelIndex,QModelIndex)));
+    close_database();
 }
