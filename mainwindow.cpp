@@ -281,7 +281,7 @@ void MainWindow::on_actionExport_triggered()
         export_file.write("CREATE TABLE transactions(id INTEGER PRIMARY KEY AUTOINCREMENT, description TEXT, mode TEXT, trans_amount DOUBLE, balance DOUBLE, date_added DATE);\n");
         QString write_str;
         while(get_all_transactions_qry.next()){
-            write_str = "INSERT INTO transactions (id, description, mode, trans_amount, balance, date_added) VALUES (" + get_all_transactions_qry.value(0).toString() + ", '" + get_all_transactions_qry.value(1).toString() + "', '" + get_all_transactions_qry.value(2).toString() + "', " + get_all_transactions_qry.value(3).toString() + ", " + get_all_transactions_qry.value(4).toString() + ", '" + get_all_transactions_qry.value(5).toString() + "');\n";
+            write_str = "INSERT INTO transactions (id, description, mode, trans_amount, balance, date_added) VALUES (" + get_all_transactions_qry.value(ID).toString() + ", '" + get_all_transactions_qry.value(DESCRIPTION).toString() + "', '" + get_all_transactions_qry.value(MODE).toString() + "', " + get_all_transactions_qry.value(TRANSACTION_AMOUNT).toString() + ", " + get_all_transactions_qry.value(BALANCE).toString() + ", '" + get_all_transactions_qry.value(DATE_ADDED).toString() + "');\n";
             logger->log(Logger::DEBUG, "Writing " + write_str);
             export_file.write(write_str.toUtf8());
             count++;
@@ -412,8 +412,8 @@ void MainWindow::on_actionTransaction_triggered()
     
     edit_trans_view = new QTableView;
     edit_trans_view->setModel(edit_trans_model);
-    edit_trans_view->hideColumn(0);
-    edit_trans_view->hideColumn(4);
+    edit_trans_view->hideColumn(ID);
+    edit_trans_view->hideColumn(BALANCE);
     edit_trans_view->setWindowIcon(QIcon(":/imgs/money_management.gif"));
     edit_trans_view->setWindowTitle("Edit Transactions");
     edit_trans_view->resizeRowsToContents();
@@ -460,13 +460,13 @@ void MainWindow::record_changed(QModelIndex index_1, QModelIndex index_2){
             choice = QMessageBox::question(edit_trans_view, "Update Subsequent Transactions?", "All subsequent transactions will have their balances updated to reflect this change, continue?");
             if(choice == QMessageBox::Yes){
                 logger->log(Logger::DEBUG, "updating mode");                
-                double new_balance = edit_trans_model->data(edit_trans_model->index(index_1.row(), 4)).toDouble();
-                QString mode = edit_trans_model->data(edit_trans_model->index(index_1.row(), 2)).toString();
+                double new_balance = edit_trans_model->data(edit_trans_model->index(index_1.row(), BALANCE)).toDouble();
+                QString mode = edit_trans_model->data(edit_trans_model->index(index_1.row(), MODE)).toString();
                 bool negative_result = false;
                 QVector<double> results;
                 for(int i = index_1.row(); i < edit_trans_model->rowCount(); i++){
                     negative_result = false;
-                    double trans_amount = edit_trans_model->data(edit_trans_model->index(i, 3)).toDouble();
+                    double trans_amount = edit_trans_model->data(edit_trans_model->index(i, TRANSACTION_AMOUNT)).toDouble();
                     if(changed_data.toString() == "Deposit"){
                         //withdraw -> deposit.
                         if(i == index_1.row()){
@@ -512,7 +512,7 @@ void MainWindow::record_changed(QModelIndex index_1, QModelIndex index_2){
                     results.append(new_balance);
                     
                     if(i+1 < edit_trans_model->rowCount()){
-                        mode = edit_trans_model->data(edit_trans_model->index(i+1, 2)).toString();
+                        mode = edit_trans_model->data(edit_trans_model->index(i+1, MODE)).toString();
                     }else{
                         qDebug() << "should be exiting now...";
                     }
@@ -520,7 +520,7 @@ void MainWindow::record_changed(QModelIndex index_1, QModelIndex index_2){
                 if(!negative_result){
                     //write to db.
                     for(int i = index_1.row(); i < results.size(); i++){
-                        QModelIndex index = edit_trans_model->index(i, 4, QModelIndex());
+                        QModelIndex index = edit_trans_model->index(i, BALANCE, QModelIndex());
                         bool result = edit_trans_model->setData(index, results[i]);
                         logger->log(Logger::DEBUG, "update mode: " + (result ? QString("True") : QString("False")));                                
                     }
@@ -555,9 +555,9 @@ void MainWindow::record_changed(QModelIndex index_1, QModelIndex index_2){
             break;
         }
         edit_trans_model->revertRow(index_1.row());
-        double new_balance = edit_trans_model->data(edit_trans_model->index(index_1.row(), 4)).toDouble();
-        double trans_amount = edit_trans_model->data(edit_trans_model->index(index_1.row(), 3)).toDouble();
-        QString mode = edit_trans_model->data(edit_trans_model->index(index_1.row(), 2)).toString();
+        double new_balance = edit_trans_model->data(edit_trans_model->index(index_1.row(), BALANCE)).toDouble();
+        double trans_amount = edit_trans_model->data(edit_trans_model->index(index_1.row(), TRANSACTION_AMOUNT)).toDouble();
+        QString mode = edit_trans_model->data(edit_trans_model->index(index_1.row(), MODE)).toString();
         bool negative_result = false;
         if(mode == "Deposit"){
             if(new_amount > trans_amount){
@@ -581,8 +581,8 @@ void MainWindow::record_changed(QModelIndex index_1, QModelIndex index_2){
         }
         if(!negative_result){ 
             for(int i = index_1.row() + 1; i < edit_trans_model->rowCount(); i++){
-                trans_amount = edit_trans_model->data(edit_trans_model->index(i, 3)).toDouble();
-                mode = edit_trans_model->data(edit_trans_model->index(i, 2)).toString();
+                trans_amount = edit_trans_model->data(edit_trans_model->index(i, TRANSACTION_AMOUNT)).toDouble();
+                mode = edit_trans_model->data(edit_trans_model->index(i, MODE)).toString();
                 if(mode == "Deposit"){
                     new_balance += trans_amount;
                 }else{
@@ -603,12 +603,12 @@ void MainWindow::record_changed(QModelIndex index_1, QModelIndex index_2){
             }
             QMessageBox::information(edit_trans_view, "Error", "Resulting calculation is negative, reverting all changes...");                
         }else{
-            QModelIndex index = edit_trans_model->index(index_1.row(), 3, QModelIndex());
+            QModelIndex index = edit_trans_model->index(index_1.row(), TRANSACTION_AMOUNT, QModelIndex());
             bool result = edit_trans_model->setData(index, new_amount);
             logger->log(Logger::DEBUG, "update trans amount: " + (result ? QString("True") : QString("False")));                                            
             int i = index_1.row();
             while(!results.empty()){
-                QModelIndex index = edit_trans_model->index(i, 4, QModelIndex());
+                QModelIndex index = edit_trans_model->index(i, BALANCE, QModelIndex());
                 bool result = edit_trans_model->setData(index, results.front());
                 logger->log(Logger::DEBUG, "update balances after editing trans amount: " + (result ? QString("True") : QString("False")));                                                
                 results.pop_front();

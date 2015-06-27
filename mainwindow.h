@@ -105,7 +105,7 @@ private:
         MODE,
         TRANSACTION_AMOUNT,
         BALANCE,
-        DATA_ADDED
+        DATE_ADDED
     };
     
 };
