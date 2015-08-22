@@ -8,6 +8,7 @@
 #include <QTextStream>
 #include <QTableView>
 #include <QVector>
+#include <QStandardPaths>
 
 //# of ms to display messages in status bar for.
 #define MESSAGE_DISPLAY_LENGTH 4000
@@ -16,6 +17,9 @@ MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow)
 {
+    QString app_data_path = QDir::fromNativeSeparators(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation));
+    QFileInfo app_data_folder(app_data_path);
+    if(!app_data_folder.exists()) QDir().mkdir(app_data_path);
     logger = new Logger();
     ui->setupUi(this);
     //setup window attributes
@@ -31,7 +35,7 @@ MainWindow::MainWindow(QWidget *parent) :
     //only allow valid doubles for the deposit/withdrawal amt.
     ui->lineEditDepWithdr->setValidator(new QDoubleValidator(1, 10000000, 2, ui->lineEditDepWithdr));
     //the directory where the database lives.
-    db_path = QDir::currentPath() + "/transaction_db.db";
+    db_path = QDir::fromNativeSeparators(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/transaction_db.db");
     logger->log(Logger::DEBUG, "DB Path: " + db_path);    
     //init objects.
     edit_trans_model = NULL;
@@ -134,7 +138,7 @@ bool MainWindow::open_database(){
 void MainWindow::close_database(){
     //  bool status = transaction_db.commit();
     logger->log(Logger::DEBUG, "Closing database");
-    transaction_db.close();
+    if(transaction_db.isOpen()) transaction_db.close();
 }
 
 
@@ -151,11 +155,6 @@ void MainWindow::on_actionAbout_triggered()
 */
 void MainWindow::on_pushButtonSubmit_clicked()
 {
-    if(!open_database()){
-        QMessageBox::critical(this, "Error Saving Transaction", "Error saving the transaction, please try again");
-        logger->log(Logger::CRITICAL, "Error opening database to save new transaction (submit btn). Transaction not saved");
-        return;
-    }
     QString description = ui->lineEditDescription->text();
     QString mode = ui->comboBoxMode->currentText();
     double amount = ui->lineEditDepWithdr->text().toDouble();
@@ -166,6 +165,14 @@ void MainWindow::on_pushButtonSubmit_clicked()
         return;
     }
     double last_balance = get_last_transaction_balance();
+    
+    if(!open_database()){
+        QMessageBox::critical(this, "Error Saving Transaction", "Error saving the transaction, please try again");
+        logger->log(Logger::CRITICAL, "Error opening database to save new transaction (submit btn). Transaction not saved");
+        return;
+    }
+    
+    
     logger->log(Logger::DEBUG, "Last known balance (submit btn) " + QString::number(last_balance));
     if(mode == "Deposit"){
         logger->log(Logger::DEBUG, "Depositing " + QString::number(amount) + " to " + QString::number(last_balance));

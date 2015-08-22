@@ -4,13 +4,13 @@
 #include <QDebug>
 #include <QDir>
 #include <QMessageBox>
+#include <QStandardPaths>
 Logger::Logger(QObject *parent) : QObject(parent)
 {
-    QString log_folder_path = QDir::fromNativeSeparators(QDir::currentPath() + "/logs");
+    QString log_folder_path = QDir::fromNativeSeparators(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/logs");
     QFileInfo log_folder(log_folder_path);
     if(!log_folder.exists()) QDir().mkdir(log_folder_path);
     QString file_name = QDir::fromNativeSeparators(log_folder_path + "/" + QDateTime::currentDateTime().toString("MMddyyyyhhmmssA") + ".txt");
-    qDebug() << file_name;
     log_file = new QFile(file_name);
     stream = new QTextStream(log_file);
     if(!log_file->open(QFile::WriteOnly)) QMessageBox::critical(NULL, "Error", "Error opening " + file_name + " for writing");
