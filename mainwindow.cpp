@@ -17,7 +17,8 @@ MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow)
 {
-    QString app_data_path = QDir::fromNativeSeparators(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation));
+//    QString app_data_path = QDir::fromNativeSeparators(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation));
+    QString app_data_path = QDir::fromNativeSeparators(QStandardPaths::writableLocation(QStandardPaths::ApplicationsLocation));
     QFileInfo app_data_folder(app_data_path);
     if(!app_data_folder.exists()) QDir().mkdir(app_data_path);
     logger = new Logger();
@@ -35,8 +36,9 @@ MainWindow::MainWindow(QWidget *parent) :
     //only allow valid doubles for the deposit/withdrawal amt.
     ui->lineEditDepWithdr->setValidator(new QDoubleValidator(1, 10000000, 2, ui->lineEditDepWithdr));
     //the directory where the database lives.
-    db_path = QDir::fromNativeSeparators(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/transaction_db.db");
-    logger->log(Logger::DEBUG, "DB Path: " + db_path);    
+//    db_path = QDir::fromNativeSeparators(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/transaction_db.db");
+    db_path = QDir::fromNativeSeparators(QStandardPaths::writableLocation(QStandardPaths::ApplicationsLocation) + "/transaction_db.db");
+    logger->log(Logger::DEBUG, "DB Path: " + db_path);
     //init objects.
     edit_trans_model = NULL;
     edit_trans_view = NULL;

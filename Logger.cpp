@@ -7,7 +7,8 @@
 #include <QStandardPaths>
 Logger::Logger(QObject *parent) : QObject(parent)
 {
-    QString log_folder_path = QDir::fromNativeSeparators(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/logs");
+//    QString log_folder_path = QDir::fromNativeSeparators(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/logs");
+    QString log_folder_path = QDir::fromNativeSeparators(QStandardPaths::writableLocation(QStandardPaths::ApplicationsLocation) + "/logs");
     QFileInfo log_folder(log_folder_path);
     if(!log_folder.exists()) QDir().mkdir(log_folder_path);
     QString file_name = QDir::fromNativeSeparators(log_folder_path + "/" + QDateTime::currentDateTime().toString("MMddyyyyhhmmssA") + ".txt");
